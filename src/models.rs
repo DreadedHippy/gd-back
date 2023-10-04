@@ -64,7 +64,9 @@ impl AppState {
 			.fetch_one(&self.pool)
 			.await?;
 
-		self.update_info().await;
+		tokio::spawn(async {
+			self.update_info().await;
+		});
 
 		Ok(user)
 	}
