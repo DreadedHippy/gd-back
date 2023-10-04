@@ -28,7 +28,8 @@ pub async fn connect_to_postgres() -> Result<Pool<Postgres>> {
 	let record = sqlx::query(query);
 
 	// let query2 = r#"
-	// 	INSERT INTO users VALUES (1, 'u', '', '')
+	// INSERT INTO users (username, referral_code, personal_invite_code)
+	// 	VALUES ('u', '', '')
 	// "#;
 	
 	// let record = sqlx::query(query2);
