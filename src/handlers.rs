@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use axum::{extract::State, Json, response::{Response, sse::Event, Sse}, TypedHeader};
 use axum_extra::extract::WithRejection;
 use rand::Rng;
@@ -8,7 +10,7 @@ use futures::stream::{self, Stream};
 
 
 type ServerResponse<T> = Json<CustomResponse<T>>;
-use crate::{models::{AppState, CustomResponse, UserForCreate, User, LoginPayload}, custom_extractor::ApiError, utils::map_err};
+use crate::{models::{AppState, CustomResponse, UserForCreate, User, LoginPayload}, custom_extractor::ApiError, utils::{map_err, StreamType}};
 
 
 pub async fn sse_handler(
@@ -17,11 +19,16 @@ pub async fn sse_handler(
 	println!("`{}` connected", user_agent.as_str());
 	
 	let stream = BroadcastStream::new(app_state.tx.subscribe())
-	.map(|i| Event::default().json_data(i.unwrap()));
+	.map(|r|{
+		let i: StreamType = serde_json::from_str(&r.unwrap()).unwrap();
+		Event::default().json_data(i)
+	});
 
 	let first = stream::once(async move {
-		let data = app_state.latest_info;
-		Event::default().json_data(data)
+		let data = app_state.latest_info.lock().unwrap();
+		let i: StreamType = serde_json::from_str(&data).unwrap();
+		//? println!("{:#?}", i);
+		Event::default().json_data(i)
 	});
 	
 	Sse::new(first.chain(stream))

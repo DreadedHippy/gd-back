@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::env;
 
 use anyhow::Ok;
@@ -9,6 +10,9 @@ use axum::response::Response;
 use serde_json::json;
 use sqlx::{PgPool, Pool, Postgres};
 
+use crate::models::User;
+
+pub type StreamType = (Vec<User>, HashMap<String, Vec<String>>);
 pub async fn connect_to_postgres() -> Result<Pool<Postgres>> {
 	let pool = PgPool::connect(&env::var("DATABASE_URL")?).await?;
 
@@ -28,16 +32,18 @@ pub async fn connect_to_postgres() -> Result<Pool<Postgres>> {
 	"#;
 
 
-	let record = sqlx::query(query);
+	let record: sqlx::query::Query<'_, Postgres, sqlx::postgres::PgArguments> = sqlx::query(query);
+	
+	let _ = record.execute(&pool).await?;
 
 	// let query2 = r#"
 	// INSERT INTO users (username, referral_code, personal_invite_code)
-	// 	VALUES ('u', '', '')
+	// 	VALUES ('Genesis', '', '')
 	// "#;
 	
-	// let record = sqlx::query(query2);
+	// let record: sqlx::query::Query<'_, Postgres, sqlx::postgres::PgArguments> = sqlx::query(query2);
 
-	let _ = record.execute(&pool).await?;
+	// let _ = record.execute(&pool).await?;
 	
 	Ok(pool)
 }
@@ -90,5 +96,30 @@ pub fn map_err(e: sqlx::Error) -> Response {
 	};
 
 	error
+
+}
+
+pub async fn get_initial_info() ->  String {
+	let pool = connect_to_postgres().await.unwrap();
+	let mut map:HashMap<String, Vec<String>> = HashMap::new();
+
+	let q = r#"
+		SELECT *
+		FROM users
+	"#;
+
+	let record = sqlx::query_as::<_, User>(q);
+
+	let users = record
+		.fetch_all(&pool)
+		.await.unwrap();
+
+
+	users.iter().for_each(|u| {
+		let _ = map.entry(u.personal_invite_code.clone()).or_insert(vec![]);
+		map.entry(u.referral_code.clone()).or_insert(vec![]).push(u.username.clone());
+	});
+
+	serde_json::to_string(&(users, map)).unwrap()
 
 }

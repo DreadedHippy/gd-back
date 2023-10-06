@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::{Arc, Mutex}};
 
 // use axum::{response::{Response, IntoResponse}, http::StatusCode};
 // use futures::channel::mpsc::Sender;
@@ -9,8 +9,8 @@ use tokio::sync::broadcast;
 #[derive(Clone)]
 pub struct AppState {
 	pub pool: Pool<Postgres>,
-	pub tx: broadcast::Sender<(Vec<User>,HashMap<String, Vec<String>>)>,
-	pub latest_info: (Vec<User>,HashMap<String, Vec<String>>)
+	pub tx: broadcast::Sender<String>,
+	pub latest_info: Arc<Mutex<String>>
 	// pub referrals: Sender<i32>
 }
 
@@ -66,9 +66,11 @@ impl AppState {
 			.await?;
 
 
-		tokio::spawn(async {
-			self.latest_info = self.get_latest_info_from_db().await;
-			self.tx.send(self.latest_info).unwrap();
+		tokio::spawn(async move{
+			let latest_info = self.get_latest_info_from_db().await;
+			let mut info_state = self.latest_info.lock().unwrap();
+			*info_state = latest_info;
+			self.tx.send(info_state.clone()).unwrap();
 		});
 
 		Ok(user)
@@ -90,7 +92,7 @@ impl AppState {
 		Ok(users)
 	}
 
-	pub async fn get_latest_info_from_db(&self) -> (Vec<User>, HashMap<String, Vec<String>>) {
+	pub async fn get_latest_info_from_db(&self) ->  String {
 		let mut map:HashMap<String, Vec<String>> = HashMap::new();
 		let users = self.get_all_users().await.expect("Failed to get all users");
 
@@ -99,7 +101,8 @@ impl AppState {
 			map.entry(u.referral_code.clone()).or_insert(vec![]).push(u.username.clone());
 		});
 
-		(users, map)
+		serde_json::to_string(&(users, map)).unwrap()
+
 	}
 
 	
@@ -119,23 +122,6 @@ impl AppState {
 
 		Ok(user)
 	}
-
-	// pub async fn update_info(mut self) -> Response {
-	// 	// let mut map:HashMap<String, Vec<String>> = HashMap::new();
-	// 	// let users = self.get_all_users().await.expect("Failed to get all users");
-	// 	let data = self.get_initial_info().await;
-	// 	// users.iter().for_each(|u| {
-	// 	// 	let _ = map.entry(u.personal_invite_code.clone()).or_insert(vec![]);
-	// 	// 	map.entry(u.referral_code.clone()).or_insert(vec![]).push(u.username.clone());
-	// 	// });
-
-	// 	data;
-	// 	println!("\n INFO UPDATED \n");
-	// 	// self.g
-	// 	self.tx.send(self.latest_info).unwrap();
-		
-  //   StatusCode::OK.into_response()
-	// }
 }
 
 impl<T> CustomResponse<T> {

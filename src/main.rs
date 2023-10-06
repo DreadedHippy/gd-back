@@ -1,11 +1,11 @@
 use axum::http::Method;
 use tokio::sync::broadcast;
-use std::{net::SocketAddr, path::PathBuf, collections::HashMap};
+use std::{net::SocketAddr, path::PathBuf, collections::HashMap, sync::{Arc, Mutex}};
 use tower_http::{services::ServeDir, trace::TraceLayer, cors::{CorsLayer, Any}};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use dotenv::dotenv;
 
-use crate::{utils::connect_to_postgres, routes::all_routes, models::AppState};
+use crate::{utils::{connect_to_postgres, get_initial_info}, routes::all_routes, models::AppState};
 
 mod utils;
 mod routes;
@@ -27,7 +27,9 @@ async fn main() {
 
     
     let (tx, _) = broadcast::channel(2);
-    let latest_info = (vec![], HashMap::new());
+    // let latest_info = app_state.get_latest_info_from_db().await;
+    let initial_info = get_initial_info().await;
+    let latest_info = Arc::new(Mutex::new(initial_info));
 
     let mut app_state = AppState {
         pool,
@@ -35,7 +37,7 @@ async fn main() {
         latest_info
     };
 
-    app_state.latest_info = app_state.get_latest_info_from_db().await;
+    // app_state.latest_info = 
 
 
     tracing_subscriber::registry()
@@ -69,17 +71,3 @@ async fn main() {
         .await
         .unwrap();
 }
-
-
-
-
-// use tokio_stream::StreamExt;
-
-// #[tokio::main]
-// async fn main() {
-//     let mut stream = tokio_stream::iter(&[1, 2, 3]);
-
-//     while let Some(v) = stream.next().await {
-//         println!("GOT = {:?}", v);
-//     }
-// }
