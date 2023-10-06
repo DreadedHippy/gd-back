@@ -3,6 +3,11 @@ use std::env;
 
 use anyhow::Ok;
 use anyhow::Result;
+use axum::Json;
+use axum::http::StatusCode;
+use axum::response::IntoResponse;
+use axum::response::Response;
+use serde_json::json;
 // use axum::response::Response;
 // use sqlx::postgres::PgConnectOptions;
 use sqlx::{PgPool, Pool, Postgres};
@@ -40,12 +45,63 @@ pub async fn connect_to_postgres() -> Result<Pool<Postgres>> {
 	Ok(pool)
 }
 
-use std::error::Error;
-use axum::{
-    extract::{Json, rejection::JsonRejection},
-    response::IntoResponse,
-    http::StatusCode,
-};
-use serde_json::{json, Value};
+pub fn map_err(e: sqlx::Error) -> Response {
+	let error = match e {
+		sqlx::Error::Database(err) => {
+			println!("\n Database Error ->> {:#?} \n", err);
+			let f = String::from(err.code().as_deref().unwrap_or_default().to_owned());
+			let f = f.as_str();
+			let g = match f {
+				// REFERRAL CODE IS INVALID
+				"23503" => {
+					let payload = json!({
+						"message": "`referral_code` is invalid",
+						"origin": "Postgres error"
+					});
+					
+					(StatusCode::UNAUTHORIZED, Json(payload)).into_response()
+				},
 
-use crate::models::User;
+				// USER ALREADY EXISTS IN THE DATABASE
+				"23505" => {
+					let payload = json!({
+						"message": "User already exists",
+						"origin": "Postgres error"
+					});						
+					(StatusCode::CONFLICT, Json(payload)).into_response()
+				},
+				_ => {
+					(StatusCode::INTERNAL_SERVER_ERROR, "An error occurred while logging you in").into_response()
+				}
+			};
+
+			g
+		},
+		// COULD NOT FIND USER
+		sqlx::Error::RowNotFound => {
+			let payload = json!({
+				"message": "User not found",
+				"origin": "Postgres error"
+			});
+
+			(StatusCode::NOT_FOUND, Json(payload)).into_response()
+		},
+		_ => {
+			println!("\n Error ->> {:#?} \n", e);
+			(StatusCode::INTERNAL_SERVER_ERROR, "An error occurred while logging you in").into_response()
+		}
+	};
+
+	error
+
+}
+
+// use std::error::Error;
+// use axum::{
+//     extract::{Json, rejection::JsonRejection},
+//     response::IntoResponse,
+//     http::StatusCode,
+// };
+// use serde_json::{json, Value};
+
+// use crate::models::User;
