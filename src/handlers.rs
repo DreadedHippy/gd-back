@@ -1,10 +1,10 @@
-use axum::{extract::State, http::StatusCode, Json, response::{Response, IntoResponse, sse::Event, Sse}, TypedHeader};
+use axum::{extract::State, Json, response::{Response, sse::Event, Sse}, TypedHeader};
 use axum_extra::extract::WithRejection;
 use rand::Rng;
-use serde_json::json;
+// use serde_json::json;
 use tokio_stream::{StreamExt as _, wrappers::BroadcastStream};
 use futures::stream::{self, Stream};
-use std::{convert::Infallible, time::Duration, ops::Deref};
+// use std::{convert::Infallible, time::Duration, ops::Deref};
 
 
 type ServerResponse<T> = Json<CustomResponse<T>>;
@@ -15,27 +15,15 @@ pub async fn sse_handler(
 	TypedHeader(user_agent): TypedHeader<headers::UserAgent>, State(app_state): State<AppState>
 ) -> Sse<impl Stream<Item = Result<Event, serde_json::error::Error>>> {
 	println!("`{}` connected", user_agent.as_str());
-
-	// A `Stream` that repeats an event every second
-	// let stream = stream::repeat_with(|| Event::default().data("hi!"))
-	// 		.map(Ok)
-	// 		.throttle(Duration::from_secs(1));
-
+	
 	let stream = BroadcastStream::new(app_state.tx.subscribe())
 	.map(|i| Event::default().json_data(i.unwrap()));
 
 	let first = stream::once(async move {
-		let data = app_state.get_initial_info().await;
+		let data = app_state.latest_info;
 		Event::default().json_data(data)
 	});
-	// let noob_stream = stream::
-	// let event = Event::
-
-	// Sse::new(stream).keep_alive(
-	// 		axum::response::sse::KeepAlive::new()
-	// 				.interval(Duration::from_secs(1))
-	// 				.text("keep-alive-text"),
-	// )
+	
 	Sse::new(first.chain(stream))
 	.keep_alive(axum::response::sse::KeepAlive::new().text("keep-alive-text"))
 }

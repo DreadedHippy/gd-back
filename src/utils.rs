@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::env;
 
 use anyhow::Ok;
@@ -8,8 +7,6 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::response::Response;
 use serde_json::json;
-// use axum::response::Response;
-// use sqlx::postgres::PgConnectOptions;
 use sqlx::{PgPool, Pool, Postgres};
 
 pub async fn connect_to_postgres() -> Result<Pool<Postgres>> {
@@ -59,7 +56,7 @@ pub fn map_err(e: sqlx::Error) -> Response {
 						"origin": "Postgres error"
 					});
 					
-					(StatusCode::UNAUTHORIZED, Json(payload)).into_response()
+					(StatusCode::BAD_REQUEST, Json(payload)).into_response()
 				},
 
 				// USER ALREADY EXISTS IN THE DATABASE
@@ -95,13 +92,3 @@ pub fn map_err(e: sqlx::Error) -> Response {
 	error
 
 }
-
-// use std::error::Error;
-// use axum::{
-//     extract::{Json, rejection::JsonRejection},
-//     response::IntoResponse,
-//     http::StatusCode,
-// };
-// use serde_json::{json, Value};
-
-// use crate::models::User;

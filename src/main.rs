@@ -1,11 +1,11 @@
-use axum::http::{Method, header::CONTENT_TYPE};
-use tokio::{stream, sync::broadcast};
+use axum::http::Method;
+use tokio::sync::broadcast;
 use std::{net::SocketAddr, path::PathBuf, collections::HashMap};
 use tower_http::{services::ServeDir, trace::TraceLayer, cors::{CorsLayer, Any}};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use dotenv::dotenv;
 
-use crate::{utils::connect_to_postgres, routes::all_routes, models::{AppState, User}};
+use crate::{utils::connect_to_postgres, routes::all_routes, models::AppState};
 
 mod utils;
 mod routes;
@@ -27,11 +27,15 @@ async fn main() {
 
     
     let (tx, _) = broadcast::channel(2);
+    let latest_info = (vec![], HashMap::new());
 
-    let app_state = AppState {
+    let mut app_state = AppState {
         pool,
-        tx
+        tx,
+        latest_info
     };
+
+    app_state.latest_info = app_state.get_latest_info_from_db().await;
 
 
     tracing_subscriber::registry()

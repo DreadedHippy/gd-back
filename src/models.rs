@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use axum::{response::{Response, IntoResponse}, http::StatusCode};
-use futures::channel::mpsc::Sender;
+// use axum::{response::{Response, IntoResponse}, http::StatusCode};
+// use futures::channel::mpsc::Sender;
 use serde::{Deserialize, Serialize};
 use sqlx::{Postgres, Pool, Error, FromRow};
 use tokio::sync::broadcast;
@@ -9,7 +9,8 @@ use tokio::sync::broadcast;
 #[derive(Clone)]
 pub struct AppState {
 	pub pool: Pool<Postgres>,
-	pub tx: broadcast::Sender<HashMap<String, Vec<User>>>
+	pub tx: broadcast::Sender<(Vec<User>,HashMap<String, Vec<String>>)>,
+	pub latest_info: (Vec<User>,HashMap<String, Vec<String>>)
 	// pub referrals: Sender<i32>
 }
 
@@ -38,8 +39,8 @@ pub struct CustomResponse<T> {
 #[serde(untagged)]
 pub enum  CustomResponseData<T> {
 	Item(T),
-	Collection(Vec<T>),
-	Message(String)		
+	// Collection(Vec<T>),
+	// Message(String)		
 }
 
 #[derive(Deserialize, Serialize)]
@@ -48,7 +49,7 @@ pub struct LoginPayload {
 }
 
 impl AppState {
-	pub async fn save_user(self, user: UserForCreate, personal_invite_code: String) -> Result<User, Error> {
+	pub async fn save_user(mut self, user: UserForCreate, personal_invite_code: String) -> Result<User, Error> {
 		let q = r#"
 			INSERT INTO users (username, referral_code, personal_invite_code)
 			VALUES ($1, $2, $3)
@@ -64,8 +65,10 @@ impl AppState {
 			.fetch_one(&self.pool)
 			.await?;
 
+
 		tokio::spawn(async {
-			self.update_info().await;
+			self.latest_info = self.get_latest_info_from_db().await;
+			self.tx.send(self.latest_info).unwrap();
 		});
 
 		Ok(user)
@@ -87,7 +90,7 @@ impl AppState {
 		Ok(users)
 	}
 
-	pub async fn get_initial_info(&self) -> (Vec<User>, HashMap<String, Vec<String>>) {
+	pub async fn get_latest_info_from_db(&self) -> (Vec<User>, HashMap<String, Vec<String>>) {
 		let mut map:HashMap<String, Vec<String>> = HashMap::new();
 		let users = self.get_all_users().await.expect("Failed to get all users");
 
@@ -117,19 +120,22 @@ impl AppState {
 		Ok(user)
 	}
 
-	pub async fn update_info(self) -> Response {
-		let mut map = HashMap::new();
-		let users = self.get_all_users().await.expect("Failed to get all users");
+	// pub async fn update_info(mut self) -> Response {
+	// 	// let mut map:HashMap<String, Vec<String>> = HashMap::new();
+	// 	// let users = self.get_all_users().await.expect("Failed to get all users");
+	// 	let data = self.get_initial_info().await;
+	// 	// users.iter().for_each(|u| {
+	// 	// 	let _ = map.entry(u.personal_invite_code.clone()).or_insert(vec![]);
+	// 	// 	map.entry(u.referral_code.clone()).or_insert(vec![]).push(u.username.clone());
+	// 	// });
 
-		users.into_iter().for_each(|u| {
-			let _ = map.entry(u.personal_invite_code.clone()).or_insert(vec![]);
-			map.entry(u.referral_code.clone()).or_insert(vec![]).push(u);
-		});
-
-		self.tx.send(map).unwrap();
+	// 	data;
+	// 	println!("\n INFO UPDATED \n");
+	// 	// self.g
+	// 	self.tx.send(self.latest_info).unwrap();
 		
-    StatusCode::OK.into_response()
-	}
+  //   StatusCode::OK.into_response()
+	// }
 }
 
 impl<T> CustomResponse<T> {
