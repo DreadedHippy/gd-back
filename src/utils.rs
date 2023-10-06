@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::env;
 
 use anyhow::Ok;
@@ -38,3 +39,13 @@ pub async fn connect_to_postgres() -> Result<Pool<Postgres>> {
 	
 	Ok(pool)
 }
+
+use std::error::Error;
+use axum::{
+    extract::{Json, rejection::JsonRejection},
+    response::IntoResponse,
+    http::StatusCode,
+};
+use serde_json::{json, Value};
+
+use crate::models::User;

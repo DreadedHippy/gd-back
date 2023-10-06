@@ -87,6 +87,18 @@ impl AppState {
 		Ok(users)
 	}
 
+	pub async fn get_initial_info(&self) -> (Vec<User>, HashMap<String, Vec<String>>) {
+		let mut map:HashMap<String, Vec<String>> = HashMap::new();
+		let users = self.get_all_users().await.expect("Failed to get all users");
+
+		users.iter().for_each(|u| {
+			let _ = map.entry(u.personal_invite_code.clone()).or_insert(vec![]);
+			map.entry(u.referral_code.clone()).or_insert(vec![]).push(u.username.clone());
+		});
+
+		(users, map)
+	}
+
 	
 	pub async fn get_user(self, username: String) -> Result<User, Error> {
 		let q = r#"

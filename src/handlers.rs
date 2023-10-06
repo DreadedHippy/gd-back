@@ -1,4 +1,5 @@
 use axum::{extract::State, http::StatusCode, Json, response::{Response, IntoResponse, sse::Event, Sse}, TypedHeader};
+use axum_extra::extract::WithRejection;
 use rand::Rng;
 use tokio_stream::{StreamExt as _, wrappers::BroadcastStream};
 use futures::stream::{self, Stream};
@@ -6,7 +7,7 @@ use std::{convert::Infallible, time::Duration};
 
 
 type ServerResponse<T> = Json<CustomResponse<T>>;
-use crate::models::{AppState, CustomResponse, UserForCreate, User, LoginPayload};
+use crate::{models::{AppState, CustomResponse, UserForCreate, User, LoginPayload}, custom_extractor::ApiError};
 
 
 pub async fn sse_handler(
@@ -20,7 +21,12 @@ pub async fn sse_handler(
 	// 		.throttle(Duration::from_secs(1));
 
 	let stream = BroadcastStream::new(app_state.tx.subscribe())
-		.map(|i| Event::default().json_data(i.unwrap()));
+	.map(|i| Event::default().json_data(i.unwrap()));
+
+	let first = stream::once(async move {
+		let data = app_state.get_initial_info().await;
+		Event::default().json_data(data)
+	});
 	// let noob_stream = stream::
 	// let event = Event::
 
@@ -29,11 +35,15 @@ pub async fn sse_handler(
 	// 				.interval(Duration::from_secs(1))
 	// 				.text("keep-alive-text"),
 	// )
-	Sse::new(stream)
+	Sse::new(first.chain(stream))
 	.keep_alive(axum::response::sse::KeepAlive::new().text("keep-alive-text"))
 }
 
-pub async fn handler_signup( State(app_state): State<AppState>, Json(user_info): Json<UserForCreate>) -> Result<ServerResponse<User>, Response> {
+pub async fn handler_signup(
+	State(app_state): State<AppState>,
+	WithRejection(Json(user_info), _): WithRejection<Json<UserForCreate>, ApiError>
+	// Json(user_info): Json<UserForCreate>
+) -> Result<ServerResponse<User>, Response> {
 	let rand_4 = rand::thread_rng().gen_range(1000..10000);
 	let rand_5 = rand::thread_rng().gen_range(10000..100000);
 
@@ -54,7 +64,10 @@ pub async fn handler_signup( State(app_state): State<AppState>, Json(user_info):
 }
 
 
-pub async fn handler_login( State(app_state): State<AppState>, Json(login_payload): Json<LoginPayload>) -> Result<ServerResponse<User>, Response> {
+pub async fn handler_login(
+	State(app_state): State<AppState>,
+	WithRejection(Json(login_payload), _): WithRejection<Json<LoginPayload>, ApiError>
+) -> Result<ServerResponse<User>, Response> {
 	let result = app_state.get_user(login_payload.username).await.map_err(|e| {
 		println!("{:#?}", e);
 		(StatusCode::INTERNAL_SERVER_ERROR, "An error occurred while logging you in").into_response()

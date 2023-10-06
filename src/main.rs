@@ -11,6 +11,8 @@ mod utils;
 mod routes;
 mod handlers;
 mod models;
+mod middlewares;
+pub mod custom_extractor;
 
 #[tokio::main]
 async fn main() {
@@ -21,7 +23,7 @@ async fn main() {
     let cors = CorsLayer::new()
         .allow_methods([Method::GET, Method::POST])
         .allow_origin(Any)
-        .allow_headers([CONTENT_TYPE]);
+        .allow_headers(Any);
 
     
     let (tx, _) = broadcast::channel(2);
