@@ -16,30 +16,36 @@ pub mod custom_extractor;
 
 #[tokio::main]
 async fn main() {
+    // Load env variables
     dotenv().ok();
 
+    // Get postgres connection pool
     let pool = connect_to_postgres().await.expect("Could not connect to postgres");
 
+    // Define a cors middleware accepting all origins and headers
     let cors = CorsLayer::new()
         .allow_methods([Method::GET, Method::POST])
         .allow_origin(Any)
         .allow_headers(Any);
 
-    
+    // Create a broadcast channel for the SSE
     let (tx, _) = broadcast::channel(2);
-    // let latest_info = app_state.get_latest_info_from_db().await;
+
+    // Get the most recent info from the database
     let initial_info = get_initial_info().await;
+
+    // Create a new Arc<Mutex> of this latest info
     let latest_info = Arc::new(Mutex::new(initial_info));
 
+    // Construct the app state
     let mut app_state = AppState {
         pool,
         tx,
         latest_info
     };
 
-    // app_state.latest_info = 
 
-
+    // Help with debugging
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -48,24 +54,23 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    // For static file serving
     let assets_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets");
 
+    // Create a static file service
     let static_files_service = ServeDir::new(assets_dir).append_index_html_on_directories(true);
 
-    // build our application with a route
-    // let app = Router::new()
-    //     .fallback_service(static_files_service)
-    //     .route("/sse", get(sse_handler))
-    //     .layer(TraceLayer::new_for_http())
-    //     .layer(cors);
-
+    // Get all routes using the `all_routes` function
     let routes = all_routes(app_state, static_files_service)
     .layer(TraceLayer::new_for_http())
     .layer(cors);
 
-    // run it
+    // Specify the port to run on
     let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
+
     tracing::debug!("listening on {}", addr);
+    
+    // Start te server
     axum::Server::bind(&addr)
         .serve(routes.into_make_service())
         .await
