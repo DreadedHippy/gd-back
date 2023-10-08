@@ -16,11 +16,6 @@ pub type StreamType = (Vec<User>, HashMap<String, Vec<String>>);
 pub async fn connect_to_postgres() -> Result<Pool<Postgres>> {
 	let pool = PgPool::connect(&env::var("DATABASE_URL")?).await?;
 
-	// let query = r#"
-	// 	DROP TABLE IF EXISTS users
-	// "#;
-
-
 	let query = r#"
 		CREATE TABLE IF NOT EXISTS users (
 			id SERIAL PRIMARY KEY,
@@ -31,11 +26,18 @@ pub async fn connect_to_postgres() -> Result<Pool<Postgres>> {
 		);
 	"#;
 
+	// Function to restart the table when needed
+
+	// let query = r#"
+	// 	DROP TABLE IF EXISTS users
+	// "#;
+
 
 	let record: sqlx::query::Query<'_, Postgres, sqlx::postgres::PgArguments> = sqlx::query(query);
 	
 	let _ = record.execute(&pool).await?;
 
+	// Create a genesis user, required because 'ref_code' cannot be null, for the hashmap being returned to the subscribers
 	// let query2 = r#"
 	// INSERT INTO users (username, referral_code, personal_invite_code)
 	// 	VALUES ('Genesis', '', '')
@@ -44,10 +46,11 @@ pub async fn connect_to_postgres() -> Result<Pool<Postgres>> {
 	// let record: sqlx::query::Query<'_, Postgres, sqlx::postgres::PgArguments> = sqlx::query(query2);
 
 	// let _ = record.execute(&pool).await?;
-	
+	// Return the pool after use
 	Ok(pool)
 }
 
+// Map SQLX errors to their respective JSON responses
 pub fn map_err(e: sqlx::Error) -> Response {
 	let error = match e {
 		sqlx::Error::Database(err) => {
@@ -99,6 +102,7 @@ pub fn map_err(e: sqlx::Error) -> Response {
 
 }
 
+// Get latest info to initialize the app_state subscriber with
 pub async fn get_initial_info() ->  String {
 	let pool = connect_to_postgres().await.unwrap();
 	let mut map:HashMap<String, Vec<String>> = HashMap::new();

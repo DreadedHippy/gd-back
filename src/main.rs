@@ -1,6 +1,6 @@
 use axum::http::Method;
 use tokio::sync::broadcast;
-use std::{net::SocketAddr, path::PathBuf, collections::HashMap, sync::{Arc, Mutex}};
+use std::{net::SocketAddr, path::PathBuf, sync::{Arc, Mutex}};
 use tower_http::{services::ServeDir, trace::TraceLayer, cors::{CorsLayer, Any}};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use dotenv::dotenv;
@@ -11,7 +11,6 @@ mod utils;
 mod routes;
 mod handlers;
 mod models;
-mod middlewares;
 pub mod custom_extractor;
 
 #[tokio::main]
@@ -38,7 +37,7 @@ async fn main() {
     let latest_info = Arc::new(Mutex::new(initial_info));
 
     // Construct the app state
-    let mut app_state = AppState {
+    let app_state = AppState {
         pool,
         tx,
         latest_info

@@ -1,13 +1,9 @@
-use std::collections::HashMap;
-
 use axum::{extract::State, Json, response::{Response, sse::Event, Sse}, TypedHeader};
 use axum_extra::extract::WithRejection;
 use rand::Rng;
-// use serde_json::json;
 use tokio_stream::{StreamExt as _, wrappers::BroadcastStream};
 use futures::stream::{self, Stream};
 use crate::{models::{AppState, CustomResponse, UserForCreate, User, LoginPayload}, custom_extractor::ApiError, utils::{map_err, StreamType}};
-// use std::{convert::Infallible, time::Duration, ops::Deref};
 
 // Custom response type
 type ServerResponse<T> = Json<CustomResponse<T>>;
@@ -34,13 +30,11 @@ pub async fn sse_handler(
 		// Deserialize into JSON
 		let i: StreamType = serde_json::from_str(&data).unwrap();
 
-		//? println!("{:#?}", i);
-
 		// Send as event
 		Event::default().json_data(i)
 	});
 	
-	// Send out the latest_info to every subscriber then subsequent info in the streams
+	// Firstly send out the latest_info to every subscriber then subsequent info in the streams
 	Sse::new(first.chain(stream))
 	.keep_alive(axum::response::sse::KeepAlive::new().text("keep-alive-text"))
 }
