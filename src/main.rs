@@ -66,11 +66,13 @@ async fn main() {
     .layer(cors);
 
     // Specify the port to run on
-    let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
+    let port = 8080;
+
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
 
     tracing::debug!("listening on {}", addr);
     
-    // Start te server
+    // Start the server
     axum::Server::bind(&addr)
         .serve(routes.into_make_service())
         .await
