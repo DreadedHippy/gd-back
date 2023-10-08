@@ -26,6 +26,9 @@ This repository was built with Rust and the Axum web framework. The following de
 To run this server locally, follow the steps below
 - Clone the repository: `git clone https://github.com/DreadedHippy/gd-back.git`
 - Move into the new folder: `cd gd-back`
+- Create a `.env` file with two environment variables namely,
+  - `DATABASE_URL`: The URL of the Postgres database
+  - `PORT`: Set this to 8080
 - Start the server: `cargo run`
 
 
